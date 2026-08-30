@@ -28,6 +28,8 @@ An ultra-responsive, CS:GO-inspired mechanical roulette wheel designed for conte
 
 ## 🚀 Live Demo / Deployment
 
+**Play it live here:** [https://zozami.github.io/SteamDrop/](https://zozami.github.io/SteamDrop/)
+
 Built entirely with pure **HTML5**, **Vanilla CSS**, and **Modern JavaScript** (zero build step or npm installation required).
 
 Ready to host on:
