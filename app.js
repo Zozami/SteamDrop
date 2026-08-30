@@ -27,8 +27,8 @@
       skipAnimation: "Skip",
       noWinnerPopup: "No Popup",
       streamerMode: "Streamer Mode",
-      exitStreamer: "Exit [Esc]",
-      streamerToast: "Streamer Mode — Press [Esc] or [S] to exit",
+      exitStreamer: "Exit <span class=\"hidden sm:inline\">[Esc]</span>",
+      streamerToast: "Streamer Mode <span class=\"hidden sm:inline\">— Press [Esc] or [S] to exit</span>",
       viewRolledGames: "Rolled Games",
       // Winner Modal
       unboxDropBadge: "Winner",
@@ -55,7 +55,7 @@
       langLabel: "English",
       syncingCatalog: "جاري التحميل...",
       gamesReady: (n) => `<strong>${n.toLocaleString('ar-SA')}</strong> لعبة`,
-      creatorText: "بتصوّر فيديو أو بث؟ لاهنت اذكر الحقوق: <strong class=\"text-white font-bold\">عبد العزيز</strong> (<a href=\"https://www.youtube.com/@realzozami\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-[#66c0f4] hover:underline font-semibold\">@realzozami</a>)",
+      creatorText: "بتصوّر فيديو أو بث؟ لاهنت اذكر الحقوق: <strong class=\"text-white font-bold\">عبدالعزيز</strong> (<a href=\"https://www.youtube.com/@realzozami\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-[#66c0f4] hover:underline font-semibold\">@realzozami</a>)",
       creatorDismiss: "إغلاق",
       openCase: "دوّر العجلة",
       skipAnimationBtn: "تخطي",
@@ -65,8 +65,8 @@
       skipAnimation: "تخطي",
       noWinnerPopup: "بدون نافذة",
       streamerMode: "وضع الستريمر",
-      exitStreamer: "خروج [Esc]",
-      streamerToast: "وضع الستريمر — اضغط [Esc] أو [S] للخروج",
+      exitStreamer: "خروج <span class=\"hidden sm:inline\">[Esc]</span>",
+      streamerToast: "وضع الستريمر <span class=\"hidden sm:inline\">— اضغط [Esc] أو [S] للخروج</span>",
       viewRolledGames: "الألعاب",
       // Winner Modal
       unboxDropBadge: "اللعبة الفائزة",
@@ -84,7 +84,7 @@
       copyGameTitle: "نسخ الاسم",
       copied: "تم النسخ!",
       winnerTag: "الفائز",
-      footerCreatedBy: "تطوير <strong class=\"text-slate-100 font-bold\">عبد العزيز</strong>",
+      footerCreatedBy: "تطوير <strong class=\"text-slate-100 font-bold\">عبدالعزيز</strong>",
       inspectCardTooltip: (name) => name
     }
   };
@@ -188,8 +188,8 @@
     if (instantSpinToggleLabel) instantSpinToggleLabel.textContent = t.skipAnimation;
     if (noPopupToggleLabel) noPopupToggleLabel.textContent = t.noWinnerPopup;
     if (streamerModeToggleLabel) streamerModeToggleLabel.textContent = t.streamerMode;
-    if (exitStreamerLabel) exitStreamerLabel.textContent = t.exitStreamer;
-    if (streamerToastText) streamerToastText.textContent = t.streamerToast;
+    if (exitStreamerLabel) exitStreamerLabel.innerHTML = t.exitStreamer;
+    if (streamerToastText) streamerToastText.innerHTML = t.streamerToast;
 
     if (inspectReelBtn) {
       inspectReelBtn.childNodes.forEach(node => {
@@ -475,8 +475,8 @@
   function getCardMetrics() {
     const viewport = document.querySelector('.roulette-viewport');
     const viewportWidth = viewport ? viewport.clientWidth : 1140;
-    const isMobile = window.innerWidth <= 640;
-    const count = isMobile ? 3 : 5;
+    const isMobile = viewportWidth <= 640;
+    const count = isMobile ? 2.5 : 5;
     const gap = isMobile ? 10 : 16;
 
     const cardWidth = Math.floor((viewportWidth - (gap * (count - 1))) / count);
@@ -769,9 +769,9 @@
     }
 
     const viewportCenter = metrics.viewportWidth / 2;
-    const jitter = (Math.random() - 0.5) * (metrics.cardWidth * 0.45);
     const cardCenterPosition = (WINNER_INDEX * metrics.step) + (metrics.cardWidth / 2);
-    const targetTranslateX = cardCenterPosition - viewportCenter + jitter;
+    // User requested absolute centering: removing the jitter offset.
+    const targetTranslateX = cardCenterPosition - viewportCenter;
 
     setTimeout(() => {
       prepareNextSpinReel();
@@ -997,11 +997,7 @@
   // Reel Inspector Modal
   function openReelModal() {
     const t = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
-    if (currentSpinCount > 0) {
-      reelModalSubtitle.textContent = t.rolledGamesSubtitle(currentSpinCount);
-    } else {
-      reelModalSubtitle.textContent = (currentLang === 'ar') ? "استعراض الألعاب في العجلة الحالية • دوّر العجلة عشان تسحب على لعبة!" : "Preview games on initial wheel • Spin the wheel to roll a game!";
-    }
+    reelModalSubtitle.textContent = t.rolledGamesSubtitle(currentSpinCount);
     reelSearchInput.value = '';
     renderReelGrid();
     reelModalBackdrop.classList.add('active');
@@ -1477,5 +1473,11 @@
     }
   );
 
-  window.addEventListener('resize', populateInitialReel);
+  let lastWindowWidth = window.innerWidth;
+  window.addEventListener('resize', () => {
+    if (window.innerWidth !== lastWindowWidth) {
+      lastWindowWidth = window.innerWidth;
+      populateInitialReel();
+    }
+  });
 })();

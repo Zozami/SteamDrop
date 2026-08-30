@@ -99,9 +99,21 @@
   background: linear-gradient(to left, #0e111a 20%, transparent 100%);
 }
 
+@media (max-width: 639px) {
+  .roulette-wrapper::before,
+  .roulette-wrapper::after {
+    width: 40px;
+  }
+}
+
 .roulette-wrapper {
   direction: ltr !important;
   overflow: visible !important;
+}
+
+html, body {
+  overflow-x: clip;
+  max-width: 100vw;
 }
 
 .roulette-viewport {
@@ -330,6 +342,12 @@
 .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+
+/* Mobile Horizontal Scrollbar Hiding */
+@media (max-width: 639px) {
+  .hide-scrollbar-on-mobile::-webkit-scrollbar { display: none; }
+  .hide-scrollbar-on-mobile { -ms-overflow-style: none; scrollbar-width: none; }
+}
 
 /* Global Transition Freeze for Instant Clean Language Switch */
 .disable-transitions,
