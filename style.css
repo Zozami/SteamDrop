@@ -1,0 +1,411 @@
+/* Steam Case Opener — CS:GO Roulette Physics & Animation Engine */
+
+:root {
+  /* Exact Steam store header aspect ratio (460x215 = 2.1395) so artwork is 100% visible with zero cropping */
+  --card-width: 280px;
+  --card-height: 131px;
+  --card-gap: 14px;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --card-width: 210px;
+    --card-height: 98px;
+    --card-gap: 10px;
+  }
+}
+
+* {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Background Subtle Blueprint Grid */
+.bg-grid-pattern {
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Center Pointer Target Marker */
+.target-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #ff4655, #ffd700, #ff4655);
+  z-index: 30;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.9), 0 0 30px rgba(255, 70, 85, 0.7);
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.target-marker::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 11px solid transparent;
+  border-right: 11px solid transparent;
+  border-top: 15px solid #ffd700;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.85));
+}
+
+.target-marker::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 11px solid transparent;
+  border-right: 11px solid transparent;
+  border-bottom: 15px solid #ffd700;
+  filter: drop-shadow(0 -2px 6px rgba(0, 0, 0, 0.85));
+}
+
+/* Hide center target marker when winning card pops out so it never cuts across the card */
+.roulette-wrapper.has-winner .target-marker {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+/* Edge Vignette Gradients */
+.roulette-wrapper::before,
+.roulette-wrapper::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 140px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.roulette-wrapper::before {
+  left: 0;
+  background: linear-gradient(to right, #0e111a 20%, transparent 100%);
+}
+
+.roulette-wrapper::after {
+  right: 0;
+  background: linear-gradient(to left, #0e111a 20%, transparent 100%);
+}
+
+.roulette-wrapper {
+  direction: ltr !important;
+  overflow: visible !important;
+}
+
+.roulette-viewport {
+  position: relative;
+  z-index: 10;
+  cursor: grab;
+  user-select: none;
+  touch-action: pan-y;
+  direction: ltr !important;
+  width: 100%;
+  overflow: visible !important;
+  clip-path: inset(-150px 0px -150px 0px);
+}
+
+.roulette-viewport.is-dragging {
+  cursor: grabbing;
+}
+
+.roulette-viewport.is-dragging .game-card {
+  pointer-events: none;
+}
+
+/* Roulette Track & Cards — Vertical 2:3 Portrait Box Art Presentation */
+.roulette-track {
+  display: flex;
+  flex-direction: row !important;
+  direction: ltr !important;
+  align-items: center;
+  gap: var(--card-gap, 16px);
+  padding: 20px 0;
+  margin-top: -20px;
+  margin-bottom: -20px;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+}
+
+.game-card {
+  direction: ltr !important;
+  flex: 0 0 var(--card-width, 210px);
+  width: var(--card-width, 210px);
+  height: var(--card-height, 315px);
+  background: #060911;
+  border-radius: 12px;
+  border: 1.5px solid rgba(102, 192, 244, 0.25);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  touch-action: none;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform-origin: center center;
+}
+
+.game-card:hover {
+  border-color: rgba(102, 192, 244, 0.9);
+  box-shadow: 0 14px 35px rgba(102, 192, 244, 0.45), 0 0 20px rgba(102, 192, 244, 0.3);
+  transform: translateY(-6px) scale(1.03);
+  z-index: 20;
+}
+
+.card-banner-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  filter: brightness(0.96);
+  background: #070a13;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  transition: transform 0.35s ease, filter 0.35s ease;
+}
+
+.game-card:hover .card-banner-img {
+  transform: scale(1.04);
+  filter: brightness(1.05);
+}
+
+/* Vintage Dark Gradient Fade Rising from the Bottom */
+.card-title-overlay {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  padding: 32px 10px 10px 10px;
+  background: linear-gradient(to top, rgba(3, 5, 9, 0.98) 0%, rgba(3, 5, 9, 0.8) 45%, rgba(3, 5, 9, 0.15) 85%, transparent 100%);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.card-title-text {
+  font-family: 'Rajdhani', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  width: 100%;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.95), 0 0 10px rgba(0, 0, 0, 0.85);
+}
+
+/* ==========================================
+   WINNING CARD POPPED EFFECT ON ROULETTE TRACK
+   ========================================== */
+.game-card.winning-card-popped {
+  z-index: 100 !important;
+  border-color: #66c0f4 !important;
+  transform-origin: center center;
+  animation: winningCardSlam 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, winningCardAura 2s ease-in-out infinite alternate 0.5s !important;
+}
+
+@keyframes winningCardSlam {
+  0% {
+    transform: scale(1) translateY(0);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+  }
+  50% {
+    transform: scale(1.24) translateY(-30px);
+    box-shadow: 
+      0 0 0 3.5px #ffffff,
+      0 0 45px rgba(102, 192, 244, 1),
+      0 0 90px rgba(102, 192, 244, 0.7),
+      0 28px 60px rgba(0, 0, 0, 0.95);
+  }
+  100% {
+    transform: scale(1.20) translateY(-22px);
+    box-shadow: 
+      0 0 0 3px #66c0f4,
+      0 0 35px rgba(102, 192, 244, 0.9),
+      0 0 75px rgba(102, 192, 244, 0.55),
+      0 22px 50px rgba(0, 0, 0, 0.9);
+  }
+}
+
+@keyframes winningCardAura {
+  0% {
+    transform: scale(1.20) translateY(-22px);
+    box-shadow: 
+      0 0 0 3px #66c0f4,
+      0 0 35px rgba(102, 192, 244, 0.85),
+      0 0 70px rgba(102, 192, 244, 0.5),
+      0 22px 50px rgba(0, 0, 0, 0.9);
+  }
+  100% {
+    transform: scale(1.23) translateY(-26px);
+    box-shadow: 
+      0 0 0 3.5px #ffffff,
+      0 0 50px rgba(102, 192, 244, 1),
+      0 0 95px rgba(102, 192, 244, 0.7),
+      0 26px 58px rgba(0, 0, 0, 0.95);
+  }
+}
+
+/* Light Sheen Sweep on Popped Winner Card */
+.game-card.winning-card-popped::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 65%
+  );
+  transform: rotate(30deg);
+  pointer-events: none;
+  z-index: 10;
+  animation: shineSweep 2.2s infinite;
+}
+
+@keyframes shineSweep {
+  0% {
+    transform: translateX(-100%) rotate(30deg);
+  }
+  50%, 100% {
+    transform: translateX(100%) rotate(30deg);
+  }
+}
+
+/* Modal Interactive States */
+.winner-modal-backdrop,
+.reel-modal-backdrop {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.winner-modal-backdrop.active,
+.reel-modal-backdrop.active {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.winner-modal,
+.reel-modal {
+  transform: scale(0.9) translateY(20px);
+  scale: 0.9;
+  translate: 0 20px;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), scale 0.35s cubic-bezier(0.16, 1, 0.3, 1), translate 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.winner-modal-backdrop.active .winner-modal,
+.reel-modal-backdrop.active .reel-modal {
+  transform: scale(1) translateY(0) !important;
+  scale: 1 !important;
+  translate: 0 0 !important;
+}
+
+/* Custom Scrollbars */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+
+/* Global Transition Freeze for Instant Clean Language Switch */
+.disable-transitions,
+.disable-transitions * {
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  -ms-transition: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+/* RTL Layout & Cairo Typography Adjustments */
+html[dir="rtl"] body,
+html[dir="rtl"] button,
+html[dir="rtl"] input,
+html[dir="rtl"] h1,
+html[dir="rtl"] h2,
+html[dir="rtl"] h3,
+html[dir="rtl"] span,
+html[dir="rtl"] p,
+html[dir="rtl"] a {
+  font-family: 'Cairo', sans-serif !important;
+}
+
+html[dir="rtl"] #reel-search-input {
+  padding-left: 1rem;
+  padding-right: 2.5rem;
+}
+
+html[dir="rtl"] .reel-modal-close-btn {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+/* Spinner is always locked to standard LTR unboxing physics */
+html[dir="rtl"] .roulette-wrapper,
+html[dir="rtl"] .roulette-viewport,
+html[dir="rtl"] .roulette-track,
+html[dir="rtl"] .game-card {
+  direction: ltr !important;
+}
+
+/* ==========================================
+   STREAMER / CLEAN OBS VIDEO MODE
+   ========================================== */
+body.streamer-mode header,
+body.streamer-mode #creator-disclaimer-banner,
+body.streamer-mode footer,
+body.streamer-mode .options-row {
+  display: none !important;
+}
+
+body.streamer-mode #exit-streamer-btn {
+  display: inline-flex !important;
+}
+
+body.streamer-mode main {
+  min-height: 94vh;
+  justify-content: center;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+body.streamer-mode .roulette-wrapper {
+  margin-top: 2rem !important;
+  margin-bottom: 2rem !important;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.95), 0 0 30px rgba(102, 192, 244, 0.15) !important;
+}
+
+#streamer-toast {
+  transform: translate(-50%, -20px) scale(0.95);
+}
+
+#streamer-toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  pointer-events: auto;
+}
