@@ -289,7 +289,7 @@
     }
   }
 
-  // Procedural SVG Fallback Banner (Clean Steam-Inspired Cyber Mechanical Vector)
+  // Procedural SVG Fallback Banner (Clean Minimalist Steam Vortex Vector)
   function generateGameFallbackBanner(title) {
     const rawTitle = title || 'Steam Game';
     const safeTitle = rawTitle.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -298,60 +298,27 @@
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
       <defs>
         <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#080c14"/>
-          <stop offset="40%" stop-color="#101726"/>
-          <stop offset="80%" stop-color="#0c121e"/>
-          <stop offset="100%" stop-color="#05070c"/>
+          <stop offset="0%" stop-color="#0b0f19"/>
+          <stop offset="50%" stop-color="#141c2c"/>
+          <stop offset="100%" stop-color="#090d16"/>
         </linearGradient>
-        <radialGradient id="cyberGlow" cx="50%" cy="42%" r="50%">
-          <stop offset="0%" stop-color="#66c0f4" stop-opacity="0.25"/>
-          <stop offset="60%" stop-color="#1075d3" stop-opacity="0.06"/>
-          <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
-        </radialGradient>
-        <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id="vortexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="#66c0f4"/>
-          <stop offset="100%" stop-color="#1075d3"/>
-        </linearGradient>
-        <linearGradient id="armGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#4a90e2"/>
-          <stop offset="100%" stop-color="#1e3a68"/>
+          <stop offset="60%" stop-color="#1999e3"/>
+          <stop offset="100%" stop-color="#144983"/>
         </linearGradient>
       </defs>
 
-      <!-- Background Layer -->
+      <!-- Background -->
       <rect width="600" height="900" fill="url(#bgGrad)"/>
-      <rect width="600" height="900" fill="url(#cyberGlow)"/>
+      <rect x="25" y="25" width="550" height="850" rx="16" fill="none" stroke="#66c0f4" stroke-width="1.5" stroke-opacity="0.15"/>
 
-      <!-- Subtle Cyber Tech Grid Pattern Lines -->
-      <g stroke="rgba(102, 192, 244, 0.06)" stroke-width="1.5">
-        <line x1="0" y1="225" x2="600" y2="225"/>
-        <line x1="0" y1="450" x2="600" y2="450"/>
-        <line x1="0" y1="675" x2="600" y2="675"/>
-        <line x1="150" y1="0" x2="150" y2="900"/>
-        <line x1="300" y1="0" x2="300" y2="900"/>
-        <line x1="450" y1="0" x2="450" y2="900"/>
-        <rect x="25" y="25" width="550" height="850" rx="16" fill="none" stroke="rgba(102, 192, 244, 0.12)" stroke-width="1.5"/>
-      </g>
-
-      <!-- Steam-Inspired Mechanical Crank & Flywheel Emblem -->
+      <!-- Clean Steam Vortex Mark -->
       <g transform="translate(300, 390)">
-        <!-- Outer Tech Ring -->
-        <circle cx="0" cy="0" r="115" fill="none" stroke="rgba(102, 192, 244, 0.18)" stroke-width="2" stroke-dasharray="8 6"/>
-        <circle cx="0" cy="0" r="95" fill="rgba(14, 20, 33, 0.9)" stroke="url(#metalGrad)" stroke-width="3"/>
-
-        <!-- Articulating Mechanical Crank Arm -->
-        <path d="M -16 -12 L 62 -52 L 76 -38 L -2 2 Z" fill="url(#armGrad)" stroke="#66c0f4" stroke-width="1.5" opacity="0.9"/>
-        
-        <!-- Secondary Orbital Joint -->
-        <circle cx="68" cy="-45" r="26" fill="#121a2d" stroke="url(#metalGrad)" stroke-width="2.5"/>
-        <circle cx="68" cy="-45" r="13" fill="#66c0f4" opacity="0.9"/>
-        <circle cx="68" cy="-45" r="5" fill="#ffffff"/>
-
-        <!-- Main Central Flywheel Hub -->
-        <circle cx="-10" cy="-6" r="44" fill="#0b111e" stroke="url(#metalGrad)" stroke-width="3"/>
-        <circle cx="-10" cy="-6" r="26" fill="none" stroke="rgba(102, 192, 244, 0.35)" stroke-width="1.5" stroke-dasharray="4 4"/>
-        <circle cx="-10" cy="-6" r="13" fill="#66c0f4"/>
-        <circle cx="-10" cy="-6" r="5" fill="#ffffff"/>
+        <path d="M 0 -115 C 60 -115, 115 -60, 115 0 C 115 32, 102 60, 80 80 C 74 74, 68 64, 65 52 C 84 32, 84 -8, 62 -40 C 40 -72, 0 -85, -40 -85 C -26 -103, -12 -111, 0 -115 Z" fill="url(#vortexGrad)"/>
+        <path d="M 0 -115 C 60 -115, 115 -60, 115 0 C 115 32, 102 60, 80 80 C 74 74, 68 64, 65 52 C 84 32, 84 -8, 62 -40 C 40 -72, 0 -85, -40 -85 C -26 -103, -12 -111, 0 -115 Z" fill="url(#vortexGrad)" transform="rotate(120)"/>
+        <path d="M 0 -115 C 60 -115, 115 -60, 115 0 C 115 32, 102 60, 80 80 C 74 74, 68 64, 65 52 C 84 32, 84 -8, 62 -40 C 40 -72, 0 -85, -40 -85 C -26 -103, -12 -111, 0 -115 Z" fill="url(#vortexGrad)" transform="rotate(240)"/>
+        <circle cx="0" cy="0" r="14" fill="#0b0f19"/>
       </g>
 
       <!-- Game Details & Typography -->
