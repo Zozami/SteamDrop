@@ -47,7 +47,9 @@
       copied: "Copied!",
       winnerTag: "WINNER",
       footerCreatedBy: "Created by <strong class=\"text-slate-100 font-bold\">Abdulaziz</strong>",
-      inspectCardTooltip: (name) => name
+      inspectCardTooltip: (name) => name,
+      tabWheel: "Case Opener",
+      tabChallenges: "Challenges"
     },
     ar: {
       docTitle: "عجلة ستيم",
@@ -85,7 +87,9 @@
       copied: "تم النسخ!",
       winnerTag: "الفائز",
       footerCreatedBy: "تطوير <strong class=\"text-slate-100 font-bold\">عبدالعزيز</strong>",
-      inspectCardTooltip: (name) => name
+      inspectCardTooltip: (name) => name,
+      tabWheel: "عجلة الألعاب",
+      tabChallenges: "التحديات"
     }
   };
 
@@ -117,6 +121,7 @@
   const fastSpinToggle = document.getElementById('fast-spin-toggle');
   const instantSpinToggle = document.getElementById('instant-spin-toggle');
   const instantSpinToggleLabel = document.getElementById('instant-spin-toggle-label');
+  const fastSpinLabel = document.getElementById('fast-spin-label');
   const noPopupToggle = document.getElementById('no-popup-toggle');
   const noPopupToggleLabel = document.getElementById('no-popup-toggle-label');
   const streamerModeToggle = document.getElementById('streamer-mode-toggle');
@@ -126,7 +131,6 @@
 
   // Winner Modal References
   const modalBackdrop = document.getElementById('winner-modal-backdrop');
-  const modal = document.getElementById('winner-modal');
   const modalTitle = document.getElementById('winner-title');
   const modalImg = document.getElementById('winner-img');
   const modalVideo = document.getElementById('winner-video');
@@ -143,6 +147,15 @@
   const streamerToast = document.getElementById('streamer-toast');
   const streamerToastText = document.getElementById('streamer-toast-text');
 
+  // Challenges Section Controls — the same sound / streamer switches as the
+  // Case Opener, kept in sync through the shared helpers below.
+  const sdSoundToggleBtn = document.getElementById('sd-sound-toggle');
+  const sdSoundToggleText = document.getElementById('sd-sound-toggle-text');
+  const sdSoundIcon = document.getElementById('sd-sound-icon');
+  const sdStreamerToggle = document.getElementById('sd-streamer-toggle');
+  const sdStreamerToggleLabel = document.getElementById('sd-streamer-toggle-label');
+  const sdStreamerControl = document.getElementById('sd-streamer-control');
+
   // Reel Inspector Modal References
   const inspectReelBtn = document.getElementById('inspect-reel-btn');
   const reelModalBackdrop = document.getElementById('reel-modal-backdrop');
@@ -150,6 +163,15 @@
   const reelSearchInput = document.getElementById('reel-search-input');
   const reelGrid = document.getElementById('reel-grid');
   const reelModalSubtitle = document.getElementById('reel-modal-subtitle');
+
+  // Navigation Mode References
+  const navTabWheel = document.getElementById('nav-tab-wheel');
+  const navTabChallenges = document.getElementById('nav-tab-challenges');
+  const navTabWheelLabel = document.getElementById('nav-tab-wheel-label');
+  const navTabChallengesLabel = document.getElementById('nav-tab-challenges-label');
+  const wheelView = document.getElementById('wheel-view');
+  const challengesView = document.getElementById('challenges-view');
+  let currentNavMode = 'wheel';
 
   function setLanguage(lang) {
     document.documentElement.classList.add('disable-transitions');
@@ -164,6 +186,11 @@
 
     if (langToggleLabel) langToggleLabel.textContent = t.langLabel;
     if (headerMainTitle) headerMainTitle.innerHTML = t.headerMain;
+    if (navTabWheelLabel) navTabWheelLabel.textContent = t.tabWheel;
+    if (navTabChallengesLabel) navTabChallengesLabel.textContent = t.tabChallenges;
+    if (window.challengesController && typeof window.challengesController.setLanguage === 'function') {
+      window.challengesController.setLanguage(lang);
+    }
 
     // Disclaimer banner
     const noticeText = document.getElementById('creator-notice-text');
@@ -178,14 +205,12 @@
       setSpinButtonSkipping();
     }
 
-    if (soundToggleText) {
-      soundToggleText.textContent = sounds.enabled ? t.soundOn : t.soundMuted;
-    }
-
-    const fastSpinLabel = document.querySelector('label[title*="Fast"] span');
-    if (fastSpinLabel) fastSpinLabel.textContent = t.fastSpin;
+    if (sdStreamerToggleLabel) sdStreamerToggleLabel.textContent = t.streamerMode;
+    if (sdStreamerControl) sdStreamerControl.title = t.streamerMode;
+    applySoundUI();
 
     if (instantSpinToggleLabel) instantSpinToggleLabel.textContent = t.skipAnimation;
+    if (fastSpinLabel) fastSpinLabel.textContent = t.fastSpin;
     if (noPopupToggleLabel) noPopupToggleLabel.textContent = t.noWinnerPopup;
     if (streamerModeToggleLabel) streamerModeToggleLabel.textContent = t.streamerMode;
     if (exitStreamerLabel) exitStreamerLabel.innerHTML = t.exitStreamer;
@@ -259,28 +284,55 @@
     return pool[Math.floor(Math.random() * poolLen)];
   }
 
-  // Sound Toggle Handler
-  soundToggleBtn.addEventListener('click', () => {
-    const isCurrentlyEnabled = sounds.enabled;
-    sounds.setMuted(isCurrentlyEnabled);
+  // ==========================================
+  // SHARED SOUND & STREAMER SWITCHES
+  // Both the Case Opener row and the Challenges row drive the same state, so
+  // every write goes through these helpers instead of touching one button.
+  // ==========================================
+  const SOUND_ON_ICON = `
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+  `;
+
+  const SOUND_OFF_ICON = `
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+    <line x1="23" y1="9" x2="17" y2="15"></line>
+    <line x1="17" y1="9" x2="23" y2="15"></line>
+  `;
+
+  function applySoundUI() {
     const t = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
-    if (sounds.enabled) {
-      soundToggleBtn.classList.remove('is-muted');
-      soundToggleText.textContent = t.soundOn;
-      soundIcon.innerHTML = `
-        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-      `;
-    } else {
-      soundToggleBtn.classList.add('is-muted');
-      soundToggleText.textContent = t.soundMuted;
-      soundIcon.innerHTML = `
-        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-        <line x1="23" y1="9" x2="17" y2="15"></line>
-        <line x1="17" y1="9" x2="23" y2="15"></line>
-      `;
-    }
-  });
+    const isOn = !!sounds.enabled;
+    const label = isOn ? t.soundOn : t.soundMuted;
+    const iconHTML = isOn ? SOUND_ON_ICON : SOUND_OFF_ICON;
+
+    [soundToggleBtn, sdSoundToggleBtn].forEach((btn) => {
+      if (!btn) return;
+      btn.classList.toggle('is-muted', !isOn);
+      btn.setAttribute('aria-pressed', isOn ? 'false' : 'true');
+      btn.setAttribute('title', label);
+    });
+
+    [soundToggleText, sdSoundToggleText].forEach((el) => {
+      if (el) el.textContent = label;
+    });
+
+    [soundIcon, sdSoundIcon].forEach((el) => {
+      if (el) el.innerHTML = iconHTML;
+    });
+  }
+
+  function toggleSound() {
+    sounds.setMuted(sounds.enabled);
+    applySoundUI();
+  }
+
+  function toggleStreamerMode() {
+    setStreamerMode(!document.body.classList.contains('streamer-mode'));
+  }
+
+  if (soundToggleBtn) soundToggleBtn.addEventListener('click', toggleSound);
+  if (sdSoundToggleBtn) sdSoundToggleBtn.addEventListener('click', toggleSound);
 
   function updateStatsUI() {
     const t = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
@@ -862,6 +914,17 @@
   let currentActiveTrailerUrl = null;
   let isTrailerPlaying = false;
 
+  // Escapes a plain-text value for safe interpolation into HTML markup.
+  // Game names come from a third-party dataset, so they are never trusted.
+  function escapeHTML(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function resetWinnerMedia() {
     if (modalVideo) {
       modalVideo.pause();
@@ -1042,36 +1105,38 @@
     });
 
     reelGrid.innerHTML = filtered.map(game => {
+      const safeName = escapeHTML(game.name);
+      const safeId = encodeURIComponent(Number(game.id));
       const winnerTag = game.isWinner ?
         `<div class="absolute top-2 left-2 bg-emerald-500 text-black text-xs font-black px-2 py-0.5 rounded shadow-[0_0_10px_rgba(34,197,94,0.5)]">${t.winnerTag}</div>` : '';
 
       const numId = Number(game.id);
       const verified = verifiedGameImages.get(numId);
       const candidates = getSteamCardImageCandidates(numId);
-      const imgSrc = (verified && verified.valid && verified.url) ? verified.url : candidates[0];
+      const imgSrc = escapeHTML((verified && verified.valid && verified.url) ? verified.url : candidates[0]);
 
       return `
-        <div class="bg-[#161c2c] border border-[#232d42] rounded-xl overflow-hidden flex flex-col hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] transition-all reel-card-wrapper" data-id="${game.id}">
+        <div class="bg-[#161c2c] border border-[#232d42] rounded-xl overflow-hidden flex flex-col hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] transition-all reel-card-wrapper" data-id="${safeId}">
           <div class="aspect-460/215 bg-[#090d16] relative overflow-hidden flex items-center justify-center">
             <img src="${imgSrc}"
-                 alt="${game.name}"
+                 alt="${safeName}"
                  class="w-full h-full object-cover reel-card-img"
-                 data-id="${game.id}"
+                 data-id="${safeId}"
                  data-fallback-index="0"
-                 data-name="${game.name.replace(/"/g, '&quot;')}" />
+                 data-name="${safeName}" />
             ${winnerTag}
             <div class="absolute top-2 right-2 bg-black/80 text-slate-300 text-xs font-bold px-2 py-0.5 rounded border border-white/10">#${game.position}</div>
           </div>
           <div class="p-3.5 flex flex-col flex-1 justify-between gap-3">
-            <div class="font-['Rajdhani'] text-lg font-bold text-white leading-snug line-clamp-2" title="${game.name}">${game.name}</div>
+            <div class="font-['Rajdhani'] text-lg font-bold text-white leading-snug line-clamp-2" title="${safeName}">${safeName}</div>
             <div class="flex gap-2 mt-auto">
-              <a href="https://store.steampowered.com/app/${game.id}/" target="_blank" class="flex-1 py-2 px-3 bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded-md flex items-center justify-center gap-1.5 hover:bg-blue-600 hover:border-blue-500 hover:text-white transition-all" title="${t.steamStoreBtn}">
+              <a href="https://store.steampowered.com/app/${safeId}/" target="_blank" rel="noopener noreferrer" class="flex-1 py-2 px-3 bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded-md flex items-center justify-center gap-1.5 hover:bg-blue-600 hover:border-blue-500 hover:text-white transition-all" title="${t.steamStoreBtn}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.09 3.16 9.44 7.64 11.16l3.52-5.11c-.34-.58-.54-1.25-.54-1.97 0-2.16 1.76-3.92 3.92.17 0 .34.01.5.04l3.14-4.56A6.177 6.177 0 0 0 12 6.15c-3.4 0-6.15 2.76-6.15 6.15 0 .8.16 1.56.44 2.26L2.31 16.3A11.956 11.956 0 0 1 0 12C0 5.37 5.37 0 12 0zm6.15 7.69c2.4 0 4.35 1.95 4.35 4.35 0 2.4-1.95 4.35-4.35 4.35-.43 0-.84-.06-1.23-.18l-3.32 4.82A11.94 11.94 0 0 0 12 24c6.63 0 12-5.37 12-12S18.63 0 12 0c-.26 0-.52.01-.78.03l4.7 6.82c.7-.47 1.54-.76 2.23-.76v1.6z"/>
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.09 3.16 9.44 7.64 11.16l3.52-5.11c-.34-.58-.54-1.25-.54-1.97 0-2.16 1.76-3.92 3.92-3.92.17 0 .34.01.5.04l3.14-4.56A6.177 6.177 0 0 0 12 6.15c-3.4 0-6.15 2.76-6.15 6.15 0 .8.16 1.56.44 2.26L2.31 16.3A11.956 11.956 0 0 1 0 12C0 5.37 5.37 0 12 0zm6.15 7.69c2.4 0 4.35 1.95 4.35 4.35 0 2.4-1.95 4.35-4.35 4.35-.43 0-.84-.06-1.23-.18l-3.32 4.82A11.94 11.94 0 0 0 12 24c6.63 0 12-5.37 12-12S18.63 0 12 0c-.26 0-.52.01-.78.03l4.7 6.82c.7-.47 1.54-.76 2.23-.76v1.6z"/>
                 </svg>
                 ${t.steamStoreBtn}
               </a>
-              <button class="reel-card-copy-btn py-2 px-2.5 bg-slate-900 border border-slate-800 text-slate-400 rounded-md cursor-pointer hover:bg-slate-700 hover:text-white transition-all flex items-center justify-center" data-title="${game.name.replace(/"/g, '&quot;')}" title="${t.copyGameTitle}">
+              <button class="reel-card-copy-btn py-2 px-2.5 bg-slate-900 border border-slate-800 text-slate-400 rounded-md cursor-pointer hover:bg-slate-700 hover:text-white transition-all flex items-center justify-center" data-title="${safeName}" title="${t.copyGameTitle}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -1125,7 +1190,8 @@
   function showStreamerToast() {
     if (!streamerToast) return;
     const t = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
-    if (streamerToastText) streamerToastText.textContent = t.streamerToast;
+    // The copy contains responsive <span> markup, so it must be written as HTML.
+    if (streamerToastText) streamerToastText.innerHTML = t.streamerToast;
     
     streamerToast.classList.add('show');
     if (streamerToastTimeout) clearTimeout(streamerToastTimeout);
@@ -1143,6 +1209,12 @@
     document.body.classList.toggle('streamer-mode', enabled);
     if (streamerModeToggle) {
       streamerModeToggle.checked = enabled;
+    }
+    if (sdStreamerToggle) {
+      sdStreamerToggle.checked = enabled;
+    }
+    if (sdStreamerControl) {
+      sdStreamerControl.classList.toggle('is-active', enabled);
     }
     localStorage.setItem('steam_streamer_mode', enabled ? '1' : '0');
 
@@ -1186,6 +1258,17 @@
       return;
     }
 
+    // If on Challenges mode, bypass roulette wheel controls but keep the
+    // shared sound / streamer shortcuts alive.
+    if (currentNavMode === 'challenges') {
+      if (e.code === 'KeyM') {
+        toggleSound();
+      } else if (e.code === 'KeyS' || e.code === 'KeyO') {
+        toggleStreamerMode();
+      }
+      return;
+    }
+
     // 2. SPACE or ENTER — Spin Wheel / Skip Animation / Spin Again
     if (e.code === 'Space' || e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
@@ -1204,15 +1287,13 @@
 
     // 3. KEY 'M' — Toggle Sound Mute
     if (e.code === 'KeyM') {
-      soundToggleBtn.click();
+      toggleSound();
       return;
     }
 
     // 4. KEY 'S' or 'O' — Toggle Streamer / Clean OBS Mode
     if (e.code === 'KeyS' || e.code === 'KeyO') {
-      if (streamerModeToggle) {
-        setStreamerMode(!streamerModeToggle.checked);
-      }
+      toggleStreamerMode();
       return;
     }
 
@@ -1416,13 +1497,21 @@
   // ==========================================
   const disclaimerBanner = document.getElementById('creator-disclaimer-banner');
   const dismissDisclaimerBtn = document.getElementById('dismiss-disclaimer-btn');
+  const DISCLAIMER_DISMISSED_KEY = 'steam_disclaimer_dismissed';
   if (disclaimerBanner && dismissDisclaimerBtn) {
+    // Stays dismissed across reloads (reappears only if storage is cleared).
+    if (localStorage.getItem(DISCLAIMER_DISMISSED_KEY) === '1') {
+      disclaimerBanner.style.display = 'none';
+    }
     dismissDisclaimerBtn.addEventListener('click', () => {
-      disclaimerBanner.style.transition = 'opacity 0.25s ease, transform 0.25s ease, max-height 0.3s ease, margin 0.3s ease, padding 0.3s ease';
+      localStorage.setItem(DISCLAIMER_DISMISSED_KEY, '1');
+      // Fade the banner out IN PLACE and keep its slot in the page flow —
+      // collapsing it would pull every element below it upward.
+      disclaimerBanner.style.transition = 'opacity 0.25s ease';
       disclaimerBanner.style.opacity = '0';
-      disclaimerBanner.style.transform = 'translateY(-10px) scale(0.98)';
+      disclaimerBanner.style.pointerEvents = 'none';
       setTimeout(() => {
-        disclaimerBanner.style.display = 'none';
+        disclaimerBanner.style.visibility = 'hidden';
       }, 260);
     });
   }
@@ -1447,6 +1536,23 @@
     streamerModeToggle.addEventListener('change', () => {
       setStreamerMode(streamerModeToggle.checked, true);
     });
+  }
+
+  // Restore the saved state for the challenges row too, before it is ever
+  // rendered into view (the row lives outside the wheel's options row).
+  if (sdStreamerToggle) {
+    setStreamerMode(localStorage.getItem('steam_streamer_mode') === '1', false);
+    sdStreamerToggle.addEventListener('change', () => {
+      setStreamerMode(sdStreamerToggle.checked, true);
+    });
+  }
+
+  // OBS browser-source support: add the page once as a browser source with
+  // ...?clean=1 and the interface hides itself every time, without touching
+  // the saved toggle (checkbox state is deliberately not persisted).
+  const cleanParam = new URLSearchParams(window.location.search).get('clean');
+  if (cleanParam === '1' || cleanParam === 'true') {
+    setStreamerMode(true, false);
   }
 
   initSpinnerInteractivity();
@@ -1480,4 +1586,80 @@
       populateInitialReel();
     }
   });
+
+  // ==========================================
+  // NAVIGATION MODE SWITCHER (WHEEL vs CHALLENGES)
+  // ==========================================
+  function switchNavMode(mode, updateHash = true) {
+    if (mode === currentNavMode) return;
+
+    // Check with challenges controller if active challenge is running. It asks
+    // through its own in-app dialog and re-enters this function once the user
+    // confirms the abandon.
+    if (currentNavMode === 'challenges' && window.challengesController) {
+      if (!window.challengesController.canNavigateAway(() => switchNavMode(mode, updateHash))) {
+        return; // Dialog is open; navigation resumes from its callback
+      }
+    }
+
+    currentNavMode = mode;
+
+    if (mode === 'challenges') {
+      if (wheelView) wheelView.classList.add('hidden');
+      if (challengesView) {
+        challengesView.classList.remove('hidden');
+        if (window.challengesController) {
+          window.challengesController.render();
+        }
+      }
+      if (navTabWheel) {
+        navTabWheel.classList.remove('bg-[#1075d3]/30', 'border-[#1075d3]', 'text-white', 'shadow-sm');
+        navTabWheel.classList.add('text-slate-300', 'hover:text-white', 'hover:bg-white/5', 'border-transparent');
+      }
+      if (navTabChallenges) {
+        navTabChallenges.classList.remove('text-slate-300', 'hover:text-white', 'hover:bg-white/5', 'border-transparent');
+        navTabChallenges.classList.add('bg-[#1075d3]/30', 'border-[#1075d3]', 'text-white', 'shadow-sm');
+      }
+      if (updateHash) {
+        window.location.hash = 'challenges';
+      }
+    } else {
+      if (challengesView) challengesView.classList.add('hidden');
+      if (wheelView) wheelView.classList.remove('hidden');
+      if (navTabChallenges) {
+        navTabChallenges.classList.remove('bg-[#1075d3]/30', 'border-[#1075d3]', 'text-white', 'shadow-sm');
+        navTabChallenges.classList.add('text-slate-300', 'hover:text-white', 'hover:bg-white/5', 'border-transparent');
+      }
+      if (navTabWheel) {
+        navTabWheel.classList.remove('text-slate-300', 'hover:text-white', 'hover:bg-white/5', 'border-transparent');
+        navTabWheel.classList.add('bg-[#1075d3]/30', 'border-[#1075d3]', 'text-white', 'shadow-sm');
+      }
+      if (updateHash) {
+        window.location.hash = 'wheel';
+      }
+    }
+  }
+
+  if (navTabWheel) {
+    navTabWheel.addEventListener('click', () => switchNavMode('wheel'));
+  }
+  if (navTabChallenges) {
+    navTabChallenges.addEventListener('click', () => switchNavMode('challenges'));
+  }
+
+  function handleHashNavigation() {
+    const hash = window.location.hash.toLowerCase();
+    if (hash === '#challenges') {
+      switchNavMode('challenges', false);
+    } else if (hash === '#wheel') {
+      switchNavMode('wheel', false);
+    }
+  }
+
+  window.addEventListener('hashchange', handleHashNavigation);
+
+  // Initialize view from URL hash if provided
+  if (window.location.hash.toLowerCase() === '#challenges') {
+    switchNavMode('challenges', false);
+  }
 })();

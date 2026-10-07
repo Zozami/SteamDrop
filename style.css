@@ -343,12 +343,6 @@ html, body {
 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
 
-/* Mobile Horizontal Scrollbar Hiding */
-@media (max-width: 639px) {
-  .hide-scrollbar-on-mobile::-webkit-scrollbar { display: none; }
-  .hide-scrollbar-on-mobile { -ms-overflow-style: none; scrollbar-width: none; }
-}
-
 /* Global Transition Freeze for Instant Clean Language Switch */
 .disable-transitions,
 .disable-transitions * {
@@ -397,7 +391,8 @@ html[dir="rtl"] .game-card {
 body.streamer-mode header,
 body.streamer-mode #creator-disclaimer-banner,
 body.streamer-mode footer,
-body.streamer-mode .options-row {
+body.streamer-mode .options-row,
+body.streamer-mode .sd-utils {
   display: none !important;
 }
 
@@ -426,4 +421,794 @@ body.streamer-mode .roulette-wrapper {
   opacity: 1;
   transform: translate(-50%, 0) scale(1);
   pointer-events: auto;
+}
+
+/* ==========================================
+   CHALLENGES MODE AESTHETICS
+   Tactical Dark SteamDrop Theme
+   ==========================================
+   The challenge views re-render in place whenever the timer is started or
+   stopped. Deliberately no entrance animation: the page must stay perfectly
+   still through a start/stop cycle. */
+
+/* ==========================================================================
+   CHALLENGES — TACTICAL UI SYSTEM
+   One typeface (Cairo covers Latin + Arabic), flat surfaces, no bloom.
+   ========================================================================== */
+
+/* A single font for the whole section and its dialogs — no mixing of
+   display / mono faces. */
+#challenges-view,
+#challenges-view *,
+.sd-modal-backdrop,
+.sd-modal-backdrop * {
+  font-family: 'Cairo', system-ui, -apple-system, 'Segoe UI', sans-serif !important;
+}
+
+/* --- Surfaces ------------------------------------------------------------ */
+.sd-panel {
+  border-radius: 16px;
+  border: 1px solid #273148;
+  border-top-color: #33405d;
+  background: linear-gradient(180deg, #171d2b 0%, #131926 100%);
+  box-shadow: 0 18px 34px -26px rgba(0, 0, 0, 0.95);
+}
+
+.sd-panel--pad { padding: 20px 22px; }
+
+.sd-panel--live {
+  border-color: #2f6b52;
+  border-top-color: #3f8f6c;
+  box-shadow:
+    0 18px 34px -26px rgba(0, 0, 0, 0.95),
+    0 0 34px -6px rgba(96, 220, 150, 0.18);
+}
+
+/* Recorded state: same treatment in the blue family, one short flash when
+   the timer stops, then it settles. */
+.sd-panel--recorded {
+  border-color: #2f5f86;
+  border-top-color: #3f82b8;
+  box-shadow:
+    0 18px 34px -26px rgba(0, 0, 0, 0.95),
+    0 0 34px -6px rgba(110, 180, 235, 0.20);
+  animation: sdRecordedFlash 0.9s ease-out;
+}
+
+@keyframes sdRecordedFlash {
+  from {
+    box-shadow:
+      0 18px 34px -26px rgba(0, 0, 0, 0.95),
+      0 0 52px -4px rgba(110, 180, 235, 0.45);
+  }
+  to {
+    box-shadow:
+      0 18px 34px -26px rgba(0, 0, 0, 0.95),
+      0 0 34px -6px rgba(110, 180, 235, 0.20);
+  }
+}
+
+/* --- Type scale ---------------------------------------------------------- */
+.sd-h1 {
+  font-size: clamp(1.6rem, 3.6vw, 2.3rem);
+  font-weight: 800;
+  line-height: 1.2;
+  color: #ffffff;
+}
+
+.sd-h3 {
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.sd-eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7a91;
+}
+
+.sd-body {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #94a3b8;
+}
+
+.sd-note {
+  max-width: 520px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  text-align: center;
+  color: #74839a;
+}
+
+/* The objective sits in a box with a reserved height, sized for the longest
+   objective in the database (2 lines on desktop, 3 on phones). A one-line
+   objective therefore occupies exactly the same space as a two-line one and
+   nothing below it ever shifts. Text is centred inside the reserved box. */
+.sd-objective-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.8em;
+  margin: 0 0 22px;
+  font-size: clamp(1.3rem, 2.9vw, 1.9rem);
+  line-height: 1.4;
+}
+
+.sd-objective {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  max-width: 620px;
+  margin: 0;
+  overflow: hidden;
+  font-size: inherit;
+  font-weight: 800;
+  line-height: inherit;
+  color: #ffffff;
+  text-wrap: balance;
+}
+
+/* --- Mode cards ---------------------------------------------------------- */
+.sd-grid-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-items: stretch;
+  gap: 16px;
+  width: 100%;
+  max-width: 760px;
+}
+
+.sd-mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px 24px 24px;
+}
+
+.sd-mode-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.sd-mode-title svg {
+  flex: none;
+  color: #7aa7c9;
+}
+
+/* --- Buttons ------------------------------------------------------------- */
+.sd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.1s ease;
+}
+
+.sd-btn:active { transform: translateY(1px); }
+.sd-btn svg { flex: none; }
+
+.sd-btn--md { padding: 13px 18px; font-size: 14px; }
+.sd-btn--lg { padding: 16px 22px; }
+
+.sd-btn--go { background: #16803f; }
+.sd-btn--go:hover { background: #1a9a4c; }
+
+.sd-btn--stop { background: #a5123a; }
+.sd-btn--stop:hover { background: #c11745; }
+
+.sd-btn--blue { background: #1466b8; }
+.sd-btn--blue:hover { background: #1878d4; }
+
+.sd-btn--ghost {
+  border-color: #2f3b58;
+  background: #1b2233;
+  color: #c3cfdf;
+}
+
+.sd-btn--ghost:hover {
+  background: #212a3e;
+  color: #ffffff;
+}
+
+/* Abandoning is a real action, so it gets a visible bordered button — quiet
+   next to Start/Stop, but unmistakably clickable. */
+.sd-btn--danger-ghost {
+  align-self: center;
+  padding: 9px 18px;
+  border-color: #3a2b3d;
+  background: #1d1721;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b98fa0;
+}
+
+.sd-btn--danger-ghost:hover {
+  border-color: #a5123a;
+  background: #2a1622;
+  color: #ffd9e1;
+}
+
+/* Moving on to the next objective is a secondary step, so it is a centred
+   pill rather than the full-width rectangle used by Start / Stop. */
+.sd-btn--next {
+  align-self: center;
+  padding: 11px 20px;
+  border-color: #2f6b9e;
+  border-radius: 999px;
+  background: #17222f;
+  font-size: 14px;
+  color: #8ec4e8;
+}
+
+.sd-btn--next:hover {
+  border-color: #3f8fcc;
+  background: #1b2b3d;
+  color: #ffffff;
+}
+
+.sd-btn-note {
+  margin-inline-start: 10px;
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid rgba(142, 196, 232, 0.35);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+/* --- Pills & inputs ------------------------------------------------------ */
+.sd-pill {
+  flex: 1 1 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid #2c3752;
+  background: #191f2e;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b6c4d6;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.sd-pill:hover {
+  background: #202839;
+  color: #ffffff;
+}
+
+.sd-pill.is-selected {
+  border-color: #2f6b9e;
+  background: #1c3a5c;
+  color: #ffffff;
+}
+
+.sd-input {
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid #2c3752;
+  background: #121725;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  color: #ffffff;
+  transition: border-color 0.18s ease;
+}
+
+.sd-input::placeholder { color: #64748b; font-weight: 600; }
+.sd-input:focus { outline: none; border-color: #3d7cb0; }
+
+/* --- Utility switches (sound + streamer) --------------------------------- */
+/* These reuse the Case Opener's own classes (bg-white/5 pill for sound, plain
+   label + red checkbox for streamer mode) so both sections look identical.
+   Only the streamer-mode hide rule and the active state live here. */
+.sd-utils #sd-streamer-control.is-active span {
+  color: #fda4af;
+}
+
+/* --- Stage: timer console + progress rail -------------------------------- */
+.sd-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+  width: 100%;
+  max-width: 860px;
+}
+
+/* Wide screens put the overview beside the console, not below it. */
+@media (min-width: 1024px) {
+  .sd-stage--session { grid-template-columns: minmax(0, 1fr) 240px; }
+}
+
+.sd-console {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 26px 26px;
+  text-align: center;
+}
+
+.sd-console-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  width: 100%;
+  margin-bottom: 18px;
+}
+
+/* Header meta reads as one quiet line — step on the left, category on the
+   right — instead of two disconnected floating chips. */
+.sd-console-step {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-console-cat {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7aa7c9;
+}
+
+.sd-console-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #7f8fa6;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-panel--live .sd-console-status { color: #7ddba9; }
+.sd-panel--recorded .sd-console-status { color: #8ec4e8; }
+
+.chrono-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.sd-panel--live .chrono-dot {
+  box-shadow: 0 0 8px rgba(125, 219, 169, 0.7);
+  animation: sdDotPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sdDotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* Fixed height as well: Start/Stop and the smaller "next" pill occupy the
+   same block, so completing a run never resizes the console either. */
+.sd-controls {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+  min-height: 104px;
+  margin-top: 24px;
+}
+
+/* --- Rail ---------------------------------------------------------------- */
+.sd-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+
+.sd-rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sd-rail-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* One slim completion bar under the heading — the summary lives in the
+   count, not in another nested box. */
+.sd-rail-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: #1c2333;
+  overflow: hidden;
+}
+
+.sd-rail-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #3f8f6c;
+  box-shadow: 0 0 10px rgba(96, 220, 150, 0.35);
+  transition: width 0.45s ease;
+}
+
+.sd-rail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 52vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.sd-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.sd-slot-idx {
+  flex: none;
+  width: 22px;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #5b6880;
+  text-align: center;
+}
+
+/* The objective itself is the row content — full text, single line with an
+   ellipsis, so every row keeps the same height. */
+.sd-slot-text {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.sd-slot-time {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #9fb0c7;
+}
+
+.sd-slot-lock {
+  flex: none;
+  color: #64748b;
+  opacity: 0.9;
+}
+
+/* Finished */
+.sd-slot--done .sd-slot-idx { color: #7ddba9; }
+.sd-slot--done .sd-slot-text { color: #b9c6d8; }
+.sd-slot--done .sd-slot-time { color: #7ddba9; }
+
+/* Live */
+.sd-slot--current {
+  border-color: #2f6b9e;
+  background: #17222f;
+}
+.sd-slot--current .sd-slot-idx { color: #8ec4e8; }
+.sd-slot--current .sd-slot-text {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Upcoming: readable but clearly not active. */
+.sd-slot--locked .sd-slot-text { color: #64748b; }
+
+.sd-slot--just { animation: sdSlotFlash 1.3s ease-out; }
+
+@keyframes sdSlotFlash {
+  from { background: #1d3a2a; }
+  to { background: transparent; }
+}
+
+/* --- Log rows ------------------------------------------------------------ */
+.sd-log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sd-log-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #232c40;
+  background: #151b28;
+}
+
+.sd-log-index {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  border: 1px solid #2c6247;
+  background: #16301f;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7ddba9;
+}
+
+.sd-log-text {
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #d5dfeb;
+}
+
+.sd-time-pill {
+  flex: none;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid #232c40;
+  background: #10151f;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 700;
+  color: #7ddba9;
+}
+
+/* --- Scoreboard ---------------------------------------------------------- */
+.sd-stat {
+  padding: 18px 14px;
+  text-align: center;
+}
+
+.sd-stat__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7a91;
+}
+
+.sd-stat__value {
+  margin-top: 6px;
+  font-size: clamp(1.3rem, 3.2vw, 1.7rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #e8eefb;
+}
+
+.sd-stat__value--blue { color: #8ec4e8; }
+.sd-stat__value--gold { color: #e8c46a; }
+.sd-stat__value--green { color: #7ddba9; }
+
+.sd-hero-badge {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid #2c6247;
+  background: #14291f;
+  color: #7ddba9;
+}
+
+/* --- Chronometer ---------------------------------------------------------
+   No inner box, no tiles: the readout sits directly on the console panel as
+   one large flat number. State is carried by the digit colour and a single
+   restrained glow — nothing pulses except the status dot. */
+.chrono {
+  --chrono-glow: rgba(148, 163, 184, 0.18);
+  --chrono-color: #c3cfdf;
+  width: 100%;
+  max-width: 560px;
+  padding: 6px 0 2px;
+}
+
+.chrono[data-state='running'] {
+  --chrono-glow: rgba(96, 220, 150, 0.30);
+  --chrono-color: #ffffff;
+}
+
+.chrono[data-state='stopped'] {
+  --chrono-glow: rgba(110, 180, 235, 0.32);
+  --chrono-color: #ffffff;
+}
+
+.chrono-dial {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  direction: ltr;
+}
+
+.chrono-group {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.chrono-group--hours { display: none; }
+.chrono-dial.has-hours .chrono-group--hours { display: flex; }
+
+.chrono-digit {
+  display: block;
+  min-width: 0.62em;
+  font-size: clamp(3rem, 9vw, 4.6rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+  color: var(--chrono-color);
+  text-shadow: 0 0 22px var(--chrono-glow);
+  transform-origin: 50% 12%;
+}
+
+.chrono-group--ms .chrono-digit {
+  font-size: clamp(1.5rem, 4.2vw, 2.2rem);
+  font-weight: 700;
+  color: #8fa3bd;
+  text-shadow: 0 0 14px var(--chrono-glow);
+  align-self: center;
+}
+
+.chrono-sep {
+  font-size: clamp(2rem, 6vw, 3.2rem);
+  font-weight: 800;
+  color: #5b6880;
+  text-shadow: none;
+  padding: 0 3px;
+}
+
+.chrono-sep--ms { font-size: clamp(1.5rem, 4.2vw, 2.2rem); }
+
+.chrono-digit.flip {
+  animation: sdFlip 0.2s ease-out;
+}
+
+@keyframes sdFlip {
+  0% {
+    transform: translateY(-30%);
+    opacity: 0.35;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* --- In-app confirmation dialog ----------------------------------------- */
+.sd-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(4, 6, 10, 0.72);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.sd-modal-backdrop.is-open { opacity: 1; }
+
+.sd-modal {
+  width: 100%;
+  max-width: 400px;
+  padding: 22px;
+  border-radius: 16px;
+  border: 1px solid #273148;
+  border-top-color: #33405d;
+  background: #151b28;
+  box-shadow: 0 26px 50px -22px rgba(0, 0, 0, 0.95);
+  transform: translateY(-6px);
+  transition: transform 0.16s ease;
+}
+
+.sd-modal-backdrop.is-open .sd-modal { transform: translateY(0); }
+
+.sd-modal-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.sd-modal-text {
+  margin-top: 8px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: #94a3b8;
+}
+
+.sd-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.sd-modal-actions .sd-btn { flex: 1 1 0; }
+
+/* --- Motion & narrow-screen courtesy ------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .sd-slot--just {
+    animation: none;
+  }
+
+  .sd-panel--live .chrono-dot {
+    animation: none;
+  }
+
+  .sd-panel--recorded {
+    animation: none;
+  }
+
+  .chrono-digit.flip { animation-duration: 0.01s; }
+  .sd-modal,
+  .sd-modal-backdrop {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Phones need a third line before the longest objectives fit. */
+  .sd-objective-slot { min-height: 4.2em; }
+  .sd-objective {
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+}
+
+@media (max-width: 400px) {
+  .chrono-digit { font-size: clamp(2.4rem, 12vw, 3rem); }
+  .chrono-group--ms .chrono-digit { font-size: 1.2rem; }
+  .sd-console { padding: 20px 16px 22px; }
+}
+
+/* Custom Number Input for Session Count */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
 }

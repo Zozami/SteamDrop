@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-main: #0c0e14;
+  --color-bg-surface: #141824;
+  --color-bg-card: #181d2c;
+  --color-border-dark: #262c3e;
+  --color-steam-blue: #66c0f4;
+  --color-steam-dark: #171a21;
+  --color-accent-gold: #ffd700;
+  --color-accent-green: #22c55e;
+  --color-accent-green-hover: #16a34a;
+
+  --font-rajdhani: 'Rajdhani', 'Cairo', sans-serif;
+  --font-chakra: 'Chakra Petch', 'Cairo', sans-serif;
+}

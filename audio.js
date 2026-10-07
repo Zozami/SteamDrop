@@ -14,6 +14,98 @@ class SoundEngine {
     this.lastWinTime = 0;
     this.activeVoiceNodes = new Set();
     this.clickBuffer = null;
+
+    // Sampled cues (mp3 files in ./sounds) — see _loadSample() below.
+    this.sampleBuffers = {};
+    this.sampleSources = {};
+  }
+
+  // =========================================================================
+  // SAMPLED CUES (MP3)
+  // Two real recordings replace synthesized cues for the two big challenge
+  // moments. Files are fetched once, decoded into AudioBuffers, and played
+  // through the master gain so the site-wide mute still silences them.
+  // =========================================================================
+  _loadSample(key, url) {
+    if (!this.ctx) return Promise.resolve(null);
+    if (this.sampleBuffers[key]) return Promise.resolve(this.sampleBuffers[key]);
+    if (!this.sampleRequests) this.sampleRequests = {};
+    if (this.sampleRequests[key]) return this.sampleRequests[key];
+
+    this.sampleRequests[key] = fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.arrayBuffer();
+      })
+      .then((raw) => this.ctx.decodeAudioData(raw))
+      .then((buf) => {
+        this.sampleBuffers[key] = buf;
+        return buf;
+      })
+      .catch(() => {
+        // Download or decode failed — clear the slot so a later call can
+        // retry, and let the caller fall back to the synthesized cue.
+        this.sampleRequests[key] = null;
+        return null;
+      });
+    return this.sampleRequests[key];
+  }
+
+  _playSample(key, { volume = 1, loop = false, onended = null } = {}) {
+    if (!this.enabled || !this.ctx) return null;
+    const buf = this.sampleBuffers[key];
+    if (!buf) return null;
+
+    this._stopSample(key);
+
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = loop;
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+    src.connect(gain);
+    gain.connect(this.masterGain);
+    src.start();
+
+    const handle = { src, gain };
+    this.sampleSources[key] = handle;
+
+    src.onended = () => {
+      if (this.sampleSources[key] === handle) delete this.sampleSources[key];
+      if (typeof onended === 'function') onended();
+    };
+    return handle;
+  }
+
+  _stopSample(key) {
+    const handle = this.sampleSources[key];
+    if (!handle) return;
+    delete this.sampleSources[key];
+    try {
+      handle.src.onended = null;
+      handle.src.stop();
+    } catch (_) {}
+  }
+
+  // The speedrun track runs while the timer runs, so stopping it must fade —
+  // a hard cut is jarring, and the timer can be stopped at any moment.
+  stopChallengeMusic() {
+    const handle = this.sampleSources.challengeMusic;
+    if (!handle) return;
+    delete this.sampleSources.challengeMusic;
+    try {
+      const now = this.ctx ? this.ctx.currentTime : 0;
+      handle.gain.gain.cancelScheduledValues(now);
+      handle.gain.gain.setValueAtTime(handle.gain.gain.value, now);
+      handle.gain.gain.linearRampToValueAtTime(0.0001, now + 0.35);
+      handle.src.stop(now + 0.4);
+    } catch (_) {
+      try { handle.src.stop(); } catch (_e) {}
+    }
+  }
+
+  stopAllSamples() {
+    Object.keys(this.sampleSources).forEach((key) => this._stopSample(key));
   }
 
   init() {
@@ -38,6 +130,15 @@ class SoundEngine {
 
       this._generateClickBuffer();
     }
+    // The context is created on the first user gesture — that is the moment
+    // to kick off the mp3 downloads too, so the first timer start never finds
+    // an empty buffer. Idempotent: later calls keep the decoded buffers.
+    if (!this.ctx) return;
+    if (!this.samplesRequested) {
+      this.samplesRequested = true;
+      this._loadSample('challengeMusic', 'sounds/Dream Speedrun Music.mp3');
+      this._loadSample('sessionFanfare', 'sounds/RDR2 Low honor sound effect.mp3');
+    }
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
@@ -46,6 +147,11 @@ class SoundEngine {
   setMuted(muted) {
     this.enabled = !muted;
     this.init();
+    // A muted engine must not keep playing the challenge music in the
+    // background — kill any running sample, not just future cues.
+    if (muted) {
+      this.stopAllSamples();
+    }
     if (this.ctx && this.masterGain) {
       this.masterGain.gain.cancelScheduledValues(this.ctx.currentTime);
       this.masterGain.gain.setValueAtTime(this.enabled ? 0.85 : 0.0, this.ctx.currentTime);
@@ -336,7 +442,47 @@ class SoundEngine {
     osc.start(now);
     osc.stop(now + 0.025);
   }
+
+  // =========================================================================
+  // 6. CHALLENGES — SAMPLED CUES ONLY
+  // The two real recordings carry the big moments; nothing synthesized is
+  // layered underneath them.
+  //   timer start ............ Dream Speedrun Music
+  //   whole session done ..... RDR2 Low Honor sting
+  // =========================================================================
+
+  // Timer armed - the Dream speedrun track plays over the run.
+  playChallengeStart() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    if (!this.sampleBuffers.challengeMusic) return;
+
+    const now = this.ctx.currentTime;
+    // Loop so a long run never ends in silence; stopRunMusic() fades it out
+    // whenever the timer stops.
+    const handle = this._playSample('challengeMusic', { volume: 0.55, loop: true });
+    if (handle) {
+      // Fade in over the first second instead of popping in at full level.
+      handle.gain.gain.setValueAtTime(0.0001, now);
+      handle.gain.gain.linearRampToValueAtTime(0.55, now + 0.8);
+    }
+  }
+
+  // Whole session complete - the RDR2 low-honor sting, nothing else.
+  playChallengeSessionComplete() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    if (!this.sampleBuffers.sessionFanfare) return;
+
+    this._playSample('sessionFanfare', { volume: 0.9 });
+  }
+
 }
 
 // Global audio engine instance
 const sounds = new SoundEngine();
+if (typeof window !== 'undefined') {
+  window.soundEngine = sounds;
+}

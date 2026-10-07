@@ -3,6 +3,57 @@
 // Single Source of Truth: Steam Official Store & Reviews API
 // ==========================================
 
+// Complete-catalog cache (IndexedDB, 24h TTL). Repeat visits load instantly
+// from the cache and the network fetch only happens in the background to
+// refresh it — and if it fails (offline, GitHub down, rate limited), the site
+// keeps working from the cached copy.
+const CATALOG_DB_NAME = 'steamdrop_catalog';
+const CATALOG_STORE = 'kv';
+const CATALOG_KEY = 'games_appid_v1';
+const CATALOG_TTL_MS = 24 * 60 * 60 * 1000;
+
+function openCatalogDB() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('no idb')); return; }
+    const req = window.indexedDB.open(CATALOG_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(CATALOG_STORE)) {
+        req.result.createObjectStore(CATALOG_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('idb open failed'));
+  });
+}
+
+async function readCatalogCache() {
+  try {
+    const db = await openCatalogDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(CATALOG_STORE, 'readonly');
+      const req = tx.objectStore(CATALOG_STORE).get(CATALOG_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+async function writeCatalogCache(entry) {
+  try {
+    const db = await openCatalogDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(CATALOG_STORE, 'readwrite');
+      tx.objectStore(CATALOG_STORE).put(entry, CATALOG_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    /* cache write failures are never fatal */
+  }
+}
+
 // Structured Game Reference
 function createGameObject(id, name, genres, tags) {
   return {
@@ -200,96 +251,6 @@ const POPULAR_STEAM_GAMES = [
   [2139460, "Once Human", "Action,RPG", "Multiplayer,Co-op,Survival,Free to Play"]
 ];
 
-// ==========================================
-// PERSISTENT SCRAPED STORAGE & LIVE STEAM SCRAPER
-// Scrapes on-demand, stores persistently in localStorage & memory
-// Reopening any card loads in 0ms with zero duplicate network requests
-// ==========================================
-
-const SCRAPED_CACHE_KEY = 'steam_scraped_games_v1';
-const gameMetadataCache = new Map();
-const activeScrapePromises = new Map();
-
-// Initialize in-memory cache from localStorage on startup
-(function initPersistentStorage() {
-  try {
-    const stored = localStorage.getItem(SCRAPED_CACHE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed && typeof parsed === 'object') {
-        for (const [id, meta] of Object.entries(parsed)) {
-          const numId = Number(id);
-          gameMetadataCache.set(numId, meta);
-          gameMetadataCache.set(String(id), meta);
-        }
-      }
-    }
-  } catch (e) {
-    console.warn("Storage init notice:", e);
-  }
-})();
-
-function saveToPersistentStorage(appId, meta) {
-  const numId = Number(appId);
-  const strId = String(appId);
-  gameMetadataCache.set(numId, meta);
-  gameMetadataCache.set(strId, meta);
-
-  try {
-    const stored = localStorage.getItem(SCRAPED_CACHE_KEY);
-    const parsed = stored ? JSON.parse(stored) : {};
-    parsed[numId] = {
-      name: meta.name,
-      price: meta.price,
-      priceSAR: meta.priceSAR,
-      priceFormatted: meta.priceFormatted,
-      isFree: meta.isFree,
-      rating: meta.rating,
-      reviewCount: meta.reviewCount,
-      reviewDesc: meta.reviewDesc,
-      genres: meta.genres,
-      tags: meta.tags,
-      releaseDate: meta.releaseDate,
-      releaseYear: meta.releaseYear,
-      description: meta.description,
-      developers: meta.developers,
-      screenshots: meta.screenshots,
-      movies: meta.movies,
-      deckStatus: meta.deckStatus,
-      hltb: meta.hltb,
-      _isLive: true,
-      _scrapedAt: Date.now()
-    };
-
-    // Keep cache healthy and within browser quotas
-    const keys = Object.keys(parsed);
-    if (keys.length > 500) {
-      delete parsed[keys[0]];
-    }
-    localStorage.setItem(SCRAPED_CACHE_KEY, JSON.stringify(parsed));
-  } catch (e) {
-    // Storage quota fallback
-  }
-}
-
-function fetchSteamAppDetails(appId) {
-  const numId = Number(appId);
-  const strId = String(appId);
-
-  if (gameMetadataCache.has(numId)) {
-    return Promise.resolve(gameMetadataCache.get(numId));
-  }
-
-  const meta = {
-    name: null,
-    movies: []
-  };
-
-  gameMetadataCache.set(numId, meta);
-  gameMetadataCache.set(strId, meta);
-  return Promise.resolve(meta);
-}
-
 // Master Initial Catalog & Active Spin Pool
 const MASTER_VERIFIED_GAMES = POPULAR_STEAM_GAMES.map(item => createGameObject(item[0], item[1], item[2], item[3]));
 let deepGameCatalog = [...MASTER_VERIFIED_GAMES];
@@ -395,14 +356,71 @@ function isJunkEntry(name) {
   return isAdultOrJunkEntry(name);
 }
 
+const CATALOG_URL = 'https://raw.githubusercontent.com/jsnli/steamappidlist/master/data/games_appid.json';
+
+// Expand the raw appid list into game objects (with keyword-based genres).
+function expandCatalog(games, seenIds, loadedList) {
+  const genreList = ['Action', 'Adventure', 'RPG', 'Strategy', 'Simulation', 'Indie', 'Casual', 'Horror', 'FPS', 'Sports', 'Racing', 'Puzzle'];
+  const tagList = ['Singleplayer', 'Multiplayer', 'Co-op', 'Open World', 'Survival', 'Story Rich'];
+
+  for (let i = 0; i < games.length; i++) {
+    const item = games[i];
+    const numId = Number(item.appid);
+    const title = (item.name || '').trim();
+    if (!numId || !title || seenIds.has(numId)) continue;
+    if (isJunkEntry(title)) continue;
+
+    seenIds.add(numId);
+
+    // Keyword-based genre detection
+    const detectedGenres = [];
+    const tLow = title.toLowerCase();
+    if (tLow.includes('rpg') || tLow.includes('quest') || tLow.includes('fantasy')) detectedGenres.push('RPG');
+    if (tLow.includes('war') || tLow.includes('fight') || tLow.includes('strike') || tLow.includes('combat')) detectedGenres.push('Action');
+    if (tLow.includes('dead') || tLow.includes('horror') || tLow.includes('dark') || tLow.includes('zombie')) detectedGenres.push('Horror');
+    if (tLow.includes('sim') || tLow.includes('tycoon') || tLow.includes('craft')) detectedGenres.push('Simulation');
+    if (tLow.includes('race') || tLow.includes('drive') || tLow.includes('speed') || tLow.includes('rally')) detectedGenres.push('Racing');
+    if (tLow.includes('puzzle') || tLow.includes('match') || tLow.includes('escape')) detectedGenres.push('Puzzle');
+    if (detectedGenres.length === 0) {
+      detectedGenres.push(genreList[numId % genreList.length]);
+      if ((numId % 3) === 0) detectedGenres.push('Indie');
+    }
+
+    const detectedTags = [tagList[numId % tagList.length]];
+    if ((numId % 2) === 0) detectedTags.push('Singleplayer');
+
+    loadedList.push(createGameObject(
+      numId,
+      title,
+      detectedGenres.join(','),
+      detectedTags.join(',')
+    ));
+  }
+}
+
+// Activate a game list as the live pool (without duplicating the curated
+// games that are already in it).
+function activateCatalog(games, seenIds, loadedList) {
+  expandCatalog(games, seenIds, loadedList);
+  if (loadedList.length > 50) {
+    deepGameCatalog = loadedList;
+    activePool = deepGameCatalog;
+    return true;
+  }
+  return false;
+}
+
 // LOAD COMPLETE STEAM GAME CATALOG
+// Cache-first: instant start from the cached copy (if any), then a background
+// network refresh. The 24h TTL keeps repeat visits from hammering the raw
+// GitHub endpoint at all.
 async function loadFullSteamCatalog(onSyncStart, onSyncComplete) {
   if (onSyncStart) onSyncStart();
 
   const seenIds = new Set();
   const loadedList = [];
 
-  // 1. Add Master Curated Steam Games
+  // 1. Add Master Curated Steam Games (always the base, never cached)
   POPULAR_STEAM_GAMES.forEach(item => {
     const numId = Number(item[0]);
     if (!seenIds.has(numId)) {
@@ -411,60 +429,32 @@ async function loadFullSteamCatalog(onSyncStart, onSyncComplete) {
     }
   });
 
-  // 2. Fetch Complete GitHub Steam App Dataset (180,000+ Games)
-  try {
-    const res = await fetch(
-      'https://raw.githubusercontent.com/jsnli/steamappidlist/master/data/games_appid.json',
-      { signal: AbortSignal.timeout(25000) }
-    );
-    if (res.ok) {
-      const games = await res.json();
-      if (Array.isArray(games)) {
-        const genreList = ['Action', 'Adventure', 'RPG', 'Strategy', 'Simulation', 'Indie', 'Casual', 'Horror', 'FPS', 'Sports', 'Racing', 'Puzzle'];
-        const tagList = ['Singleplayer', 'Multiplayer', 'Co-op', 'Open World', 'Survival', 'Story Rich'];
-
-        for (let i = 0; i < games.length; i++) {
-          const item = games[i];
-          const numId = Number(item.appid);
-          const title = (item.name || '').trim();
-          if (!numId || !title || seenIds.has(numId)) continue;
-          if (isJunkEntry(title)) continue;
-
-          seenIds.add(numId);
-
-          // Keyword-based genre detection
-          const detectedGenres = [];
-          const tLow = title.toLowerCase();
-          if (tLow.includes('rpg') || tLow.includes('quest') || tLow.includes('fantasy')) detectedGenres.push('RPG');
-          if (tLow.includes('war') || tLow.includes('fight') || tLow.includes('strike') || tLow.includes('combat')) detectedGenres.push('Action');
-          if (tLow.includes('dead') || tLow.includes('horror') || tLow.includes('dark') || tLow.includes('zombie')) detectedGenres.push('Horror');
-          if (tLow.includes('sim') || tLow.includes('tycoon') || tLow.includes('craft')) detectedGenres.push('Simulation');
-          if (tLow.includes('race') || tLow.includes('drive') || tLow.includes('speed') || tLow.includes('rally')) detectedGenres.push('Racing');
-          if (tLow.includes('puzzle') || tLow.includes('match') || tLow.includes('escape')) detectedGenres.push('Puzzle');
-          if (detectedGenres.length === 0) {
-            detectedGenres.push(genreList[numId % genreList.length]);
-            if ((numId % 3) === 0) detectedGenres.push('Indie');
-          }
-
-          const detectedTags = [tagList[numId % tagList.length]];
-          if ((numId % 2) === 0) detectedTags.push('Singleplayer');
-
-          loadedList.push(createGameObject(
-            numId,
-            title,
-            detectedGenres.join(','),
-            detectedTags.join(',')
-          ));
-        }
-      }
-    }
-  } catch (err) {
-    console.warn("Catalog sync notice:", err);
+  // 2. Serve from cache when fresh enough
+  const cached = await readCatalogCache();
+  let cacheFresh = false;
+  if (cached && Array.isArray(cached.games) && cached.savedAt &&
+      (Date.now() - cached.savedAt) < CATALOG_TTL_MS) {
+    cacheFresh = activateCatalog(cached.games, seenIds, loadedList);
+  } else if (cached && Array.isArray(cached.games)) {
+    // Stale but present — use it rather than showing nothing, then refresh.
+    activateCatalog(cached.games, seenIds, loadedList);
   }
 
-  if (loadedList.length > 50) {
-    deepGameCatalog = loadedList;
-    activePool = deepGameCatalog;
+  // 3. Background refresh (skipped entirely when the cache is fresh)
+  if (!cacheFresh) {
+    try {
+      const res = await fetch(CATALOG_URL, { signal: AbortSignal.timeout(25000) });
+      if (res.ok) {
+        const games = await res.json();
+        if (Array.isArray(games)) {
+          if (activateCatalog(games, seenIds, loadedList)) {
+            writeCatalogCache({ savedAt: Date.now(), games });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Catalog sync notice:", err);
+    }
   }
 
   if (onSyncComplete) onSyncComplete();
